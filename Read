@@ -1,0 +1,87 @@
+nano search_files.sh
+
+#!/bin/bash
+
+# Використовуємо zenity для вибору каталогу
+directory=$(zenity --file-selection --directory --title="Виберіть каталог")
+
+# Перевірка, чи це каталог
+if [ -d "$directory" ]; then
+    # Запитуємо рядок для пошуку
+    search_string=$(zenity --entry --title="Пошук рядка" --text="Введіть рядок для пошуку:")
+
+    # Виконуємо пошук по всіх файлах в обраному каталозі
+    results=$(grep -rl "$search_string" "$directory")
+
+    if [ -n "$results" ]; then
+        # Якщо результати знайдені, виводимо їх
+        output="Рядок '$search_string' знайдений у наступних файлах:\n"
+        while IFS= read -r file; do
+            file_size=$(stat -c %s "$file")
+            output+="$file (Розмір: $file_size байт)\n"
+        done <<< "$results"
+
+        zenity --info --title="Результати пошуку" --text="$output"
+    else
+        # Якщо рядок не знайдений
+        zenity --info --title="Результати пошуку" --text="Рядок '$search_string' не знайдений."
+    fi
+else
+    # Якщо це не каталог
+    zenity --error --title="Помилка" --text="Це не каталог!"
+fi
+
+
+nano file_actions.sh
+
+
+#!/bin/bash
+
+# Використовуємо zenity для вибору файлу
+file=$(zenity --file-selection --title="Виберіть файл")
+
+# Якщо користувач скасував вибір або не вибрав файл
+if [ -z "$file" ]; then
+    zenity --error --title="Помилка" --text="Файл не вибрано."
+    exit 1
+fi
+
+# Інтерактивне меню для вибору дії
+action=$(zenity --list --title="Оберіть дію" --column="Дія" \
+    "Переглянути" "Скопіювати" "Перемістити" "Видалити")
+
+# Відповідно до вибору користувача виконуємо дії
+case "$action" in
+    "Переглянути")
+        # Перегляд файлу
+        gedit "$file" & ;;
+    "Скопіювати")
+        # Запитуємо каталог для копіювання
+        destination=$(zenity --file-selection --directory --title="Виберіть каталог для копіювання")
+        if [ -d "$destination" ]; then
+            cp "$file" "$destination"
+            zenity --info --title="Успіх" --text="Файл успішно скопійовано."
+        else
+            zenity --error --title="Помилка" --text="Це не каталог."
+        fi ;;
+    "Перемістити")
+        # Запитуємо каталог для переміщення
+        destination=$(zenity --file-selection --directory --title="Виберіть каталог для переміщення")
+        if [ -d "$destination" ]; then
+            mv "$file" "$destination"
+            zenity --info --title="Успіх" --text="Файл успішно переміщено."
+        else
+            zenity --error --title="Помилка" --text="Це не каталог."
+        fi ;;
+    "Видалити")
+        # Підтвердження перед видаленням
+        if zenity --question --title="Підтвердження" --text="Ви дійсно хочете видалити файл $file?"; then
+            rm "$file"
+            zenity --info --title="Успіх" --text="Файл успішно видалено."
+        else
+            zenity --info --title="Скасовано" --text="Видалення файлу скасовано."
+        fi ;;
+    *)
+        zenity --error --title="Помилка" --text="Невідома дія."
+        exit 1 ;;
+esac
